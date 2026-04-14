@@ -265,7 +265,76 @@ router.get('/my-history', requireAuth, async (req, res, next) => {
     next(error);
   }
 });
+// 读者借阅图书
+router.post('/', requireAuth, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({ message: '只有学生可以借书' });
+    }
 
+    const { bookId } = req.body;
+    if (!bookId) {
+      return res.status(400).json({ message: '请提供图书ID' });
+    }
+
+    // 检查图书是否存在且可借
+    const book = await prisma.book.findUnique({
+      where: { id: parseInt(bookId) }
+    });
+    if (!book) {
+      return res.status(404).json({ message: '图书不存在' });
+    }
+    if (book.availableCopies <= 0) {
+      return res.status(400).json({ message: '该书已无剩余副本' });
+    }
+
+    // 检查是否已借阅未还
+    const existingLoan = await prisma.loan.findFirst({
+      where: {
+        userId: req.user.id,
+        bookId: parseInt(bookId),
+        returnDate: null
+      }
+    });
+    if (existingLoan) {
+      return res.status(400).json({ message: '您已借阅该书，请先归还' });
+    }
+
+    // 检查借阅数量限制
+    const currentCount = await prisma.loan.count({
+      where: { userId: req.user.id, returnDate: null }
+    });
+    if (currentCount >= 3) {
+      return res.status(400).json({ message: '最多同时借阅3本书' });
+    }
+
+    // 创建借阅记录
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+
+    const loan = await prisma.loan.create({
+      data: {
+        userId: req.user.id,
+        bookId: parseInt(bookId),
+        checkoutDate: new Date(),
+        dueDate: dueDate,
+        fineAmount: 0,
+        finePaid: false,
+        fineForgiven: false
+      }
+    });
+
+    // 减少可借副本数
+    await prisma.book.update({
+      where: { id: parseInt(bookId) },
+      data: { availableCopies: { decrement: 1 } }
+    });
+
+    res.json({ message: '借阅成功', loan });
+  } catch (error) {
+    next(error);
+  }
+});
 
 
 module.exports = router;
