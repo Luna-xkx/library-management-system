@@ -9,6 +9,7 @@ const booksRouter = require('./routes/books');
 const logsRouter = require('./routes/logs');
 const loansRouter = require('./routes/loans'); // 你的借阅路由
 const authRouter = require('./routes/auth');   // 鉴权路由
+const readersRouter = require('./routes/readers');
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
@@ -28,6 +29,8 @@ app.use('/api/librarian/auth', authRouter); // 馆员登录
 app.use('/api/books', booksRouter);
 app.use('/api/logs', logsRouter);
 app.use('/api/loans', loansRouter);         // 你的借阅历史入口
+app.use('/readers', readersRouter);
+app.use('/loans', loansRouter);
 
 // 兼容旧路径（保留队友的设置）
 app.use('/books', booksRouter);
